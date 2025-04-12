@@ -1,18 +1,27 @@
 import gymnasium as gym
+import jsbsim
 import numpy as np
 from stable_baselines3 import PPO
 
-
 class CustomStallRecoveryEnv(gym.Env):
-    def __init__(self, dt=0.1):
+    def __init__(self, aircraft='B747', dt=0.1):
         super(CustomStallRecoveryEnv, self).__init__()
+        self.aircraft = aircraft
         self.dt = dt  # Time step in seconds
+
+        # Initialize JSBSim simulation
+        self.sim = jsbsim.FGFDMExec(None)
+        self.sim.set_aircraft_path('aircraft')
+        self.sim.set_engine_path('engine')
+        self.sim.set_systems_path('systems')
+        self.sim.load_model(self.aircraft)
+        self.sim.set_dt(self.dt)
 
         # Define action and observation spaces
         self.action_space = gym.spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float32)  # elevator, throttle
         self.observation_space = gym.spaces.Box(
             low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
-        )  # alpha, speed, pitch_rate, pitch_angle, altitude, throttle, roll
+        )  # alpha, vc, q, theta, h, throttle, roll
 
         # Task parameters
         self.critical_alpha = 15  # Critical angle of attack (degrees)
@@ -20,60 +29,51 @@ class CustomStallRecoveryEnv(gym.Env):
         self.recovery_counter = 0
         self.required_recovery_steps = 10  # Steps needed to consider recovered
 
-        # Aircraft state variables
-        self.state = None
+        # Track previous altitude for reward calculation
         self.prev_alt = None
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
         # Set initial conditions near stall
-        self.state = np.array([
-            np.random.uniform(12, 18),  # alpha (angle of attack)
-            np.random.uniform(40, 60),  # speed (knots)
-            np.random.uniform(-0.1, 0.1),  # pitch rate
-            np.random.uniform(10, 20),  # pitch angle
-            3280,  # altitude (feet)
-            50,  # throttle (%)
-            np.random.uniform(-5, 5)  # roll (degrees)
-        ])
-        self.prev_alt = self.state[4]
+        self.sim.set_property_value('ic/alpha-deg', np.random.uniform(12, 18))
+        self.sim.set_property_value('ic/vc-kts', np.random.uniform(40, 60))
+        self.sim.set_property_value('ic/theta-deg', np.random.uniform(10, 20))
+        self.sim.set_property_value('ic/h-sl-ft', 3280)  # ~1000m
+        self.sim.set_property_value('ic/phi-deg', 0)
+        self.sim.set_property_value('ic/psi-deg', 0)
+        self.sim.run_ic()  # Initialize the simulation
+
+        self.prev_alt = self.sim.get_property_value('position/h-sl-ft')
         self.recovery_counter = 0
-        return self.state, {}
+        return self._get_observation(), {}
 
     def step(self, action):
-        # Apply actions (elevator and throttle)
-        elevator, throttle = action
-        alpha, speed, pitch_rate, pitch_angle, altitude, _, roll = self.state
+        # Apply actions
+        self.sim.set_property_value('fcs/elevator-cmd-norm', action[0])
+        self.sim.set_property_value('fcs/throttle-cmd-norm', action[1])
 
-        # Update state based on simplified dynamics
-        alpha += elevator * 0.5  # Elevator affects angle of attack
-        speed += throttle * 0.1  # Throttle affects speed
-        pitch_rate += elevator * 0.05  # Elevator affects pitch rate
-        pitch_angle += pitch_rate * self.dt  # Pitch rate affects pitch angle
-        altitude += speed * 0.1 * self.dt  # Speed affects altitude
-        roll += elevator * 0.2  # Elevator slightly affects roll
+        # Run simulation for one time step
+        self.sim.run()
 
-        # Ensure state variables stay within reasonable bounds
-        alpha = np.clip(alpha, -10, 20)
-        speed = np.clip(speed, 0, 100)
-        altitude = max(0, altitude)  # Altitude cannot go below 0
-        roll = np.clip(roll, -30, 30)
-
-        # Update the state
-        self.state = np.array([alpha, speed, pitch_rate, pitch_angle, altitude, throttle * 100, roll])
+        # Get new observation
+        obs = self._get_observation()
 
         # Compute reward
+        alpha = self.sim.get_property_value('aero/alpha-deg')
+        alt = self.sim.get_property_value('position/h-sl-ft')
+        alt_gain = alt - self.prev_alt
+        self.prev_alt = alt
+
         reward = 0
         if alpha > self.critical_alpha:
             reward -= (alpha - self.critical_alpha)  # Penalize high alpha
-        reward += 0.1 * (altitude - self.prev_alt)  # Reward altitude preservation
-        reward -= 0.01 * np.abs(elevator)  # Penalize large elevator inputs
-        self.prev_alt = altitude
+        reward += 0.1 * alt_gain  # Reward altitude preservation
+        reward -= 0.01 * np.abs(action[0])  # Penalize large elevator inputs
 
         # Check termination conditions
         terminated = False
-        if altitude <= 0:  # Crash
+        if alt <= 0:  # Crash
             terminated = True
         elif alpha < self.safe_alpha:
             self.recovery_counter += 1
@@ -82,17 +82,33 @@ class CustomStallRecoveryEnv(gym.Env):
         else:
             self.recovery_counter = 0
 
-        return self.state, reward, terminated, False, {}
+        return obs, reward, terminated, False, {}
+
+    def _get_observation(self):
+        """
+        Extract observation from the simulation state.
+        
+        Returns:
+            np.ndarray: Observation array [alpha, vc, q, theta, h, throttle, roll].
+        """
+        alpha = self.sim.get_property_value('aero/alpha-deg')
+        vc = self.sim.get_property_value('velocities/vc-kts')
+        q = self.sim.get_property_value('velocities/q-rad_sec')
+        theta = self.sim.get_property_value('attitude/theta-deg')
+        h = self.sim.get_property_value('position/h-sl-ft')
+        throttle = self.sim.get_property_value('fcs/throttle-cmd-norm') * 100  # Convert to percentage
+        roll = self.sim.get_property_value('attitude/phi-deg')
+
+        return np.array([alpha, vc, q, theta, h, throttle, roll])
 
     def close(self):
-        """Clean up the environment."""
-        self.state = None
-
+        """Clean up the simulation instance."""
+        self.sim = None
 
 def main():
     """Train and evaluate the stall recovery agent."""
     # Create environment
-    env = CustomStallRecoveryEnv()
+    env = CustomStallRecoveryEnv(aircraft='B747')
     
     # Initialize PPO agent
     model = PPO('MlpPolicy', env, verbose=1, tensorboard_log="./ppo_stall_recovery_tensorboard/")
@@ -134,7 +150,6 @@ def main():
         print(f"Average altitude loss during stalls: {avg_alt_loss:.2f} ft")
     
     env.close()
-
 
 if __name__ == "__main__":
     main()
