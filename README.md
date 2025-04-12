@@ -56,6 +56,9 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+
+
 ▶️ Usage
 1. Run the GUI
 bash
@@ -113,6 +116,7 @@ Rewards are computed based on angle-of-attack and altitude preservation.
 Termination occurs on successful recovery or crash.
 
 The GUI tracks the state, logs metrics, and provides intuitive visual feedback.
+
 
 📌 Future Enhancements
 ✅ Integrate real-world flight data logs.
