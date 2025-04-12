@@ -1,106 +1,124 @@
 # ✈️ Aircraft Stall Handler and Analysis using Reinforcement Learning and Historical Datasets
 
-A simulation-driven system that trains reinforcement learning agents to recognize and recover from aircraft stall conditions, integrated with a PyQt6 GUI for real-time monitoring and data visualization.
+An intelligent flight simulation tool that uses reinforcement learning to detect and recover from aircraft stall conditions, visualized through a modern PyQt6 GUI. The system is capable of both training and evaluating agents in a custom Gym environment using simplified flight dynamics.
 
 ---
 
-## 📌 Project Overview
+## 📌 Overview
 
-This project leverages **JSBSim**, **Stable-Baselines3**, and **PyQt6** to build a robust aircraft stall recovery handler. Using reinforcement learning (PPO algorithm) and synthetic/historical data, the system:
-- Trains an agent to recover from stall conditions.
-- Evaluates the agent’s performance across flight episodes.
-- Provides real-time plots and tables for detailed analysis.
-- Visually alerts when a stall occurs.
+This project features:
+
+- A **custom reinforcement learning environment** simulating aircraft stall behavior.
+- A **PPO agent** (from Stable-Baselines3) trained to recover from stall.
+- A **PyQt6 GUI** for live simulation, analysis, and control.
+- **Real-time plots** and **flight metrics tables** for post-simulation review.
+
+The goal is to simulate stall recovery with interpretable metrics and a user-friendly interface suitable for researchers, engineers, or enthusiasts.
+
+---
+
+## 🧠 Key Components
+
+- `AircraftSHAgent.py` – Contains the custom Gym environment and training/evaluation logic.
+- `main.py` – GUI application for simulation, visualization, training, and analysis.
 
 ---
 
 ## 🚀 Features
 
-- **Custom Gym Environment** simulating a Boeing 747 using JSBSim.
-- **Reinforcement Learning Agent** using Proximal Policy Optimization (PPO).
-- **Real-time PyQt6 GUI**:
-  - Dynamic plots for AoA, altitude, throttle, etc.
-  - Interactive flight data tables.
-  - Warnings for detected stall conditions.
-- **Evaluation Mode** to simulate and analyze stall scenarios post-training.
-
----
-
-## 🧠 Technologies Used
-
-| Category | Libraries/Frameworks |
-|---------|----------------------|
-| Simulation | [JSBSim](https://github.com/JSBSim-Team/jsbsim) |
-| RL Agent | [Stable-Baselines3](https://github.com/DLR-RM/stable-baselines3) |
-| Environment | [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) |
-| GUI | PyQt6, Matplotlib |
-| Backend | Python 3.10+ |
+- ✅ Train and evaluate a stall recovery RL agent.
+- ✅ Real-time simulation with graphical plots.
+- ✅ Flight metrics table with color-coded statuses.
+- ✅ Stall detection alerts with automatic adjustment.
+- ✅ Scrollable analysis tab with multiple time-series plots.
 
 ---
 
 ## 🛠️ Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-username/aircraft-stall-handler.git
-   cd aircraft-stall-handler
-Create a virtual environment & install dependencies
+### Requirements
+- Python 3.10+
+- PyQt6
+- Gymnasium
+- Stable-Baselines3
+- NumPy
+- Matplotlib
 
-bash
-Copy
-Edit
+### Setup
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/aircraft-stall-handler.git
+cd aircraft-stall-handler
+
+# Create a virtual environment (optional)
 python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
-Ensure JSBSim is installed and available
-
-On Linux/macOS: use apt, brew, or build from source.
-
-Windows users may need WSL or precompiled binaries.
-
-📁 Project Structure
-bash
-Copy
-Edit
-.
-├── AircraftSHAgent.py       # Custom gym environment for stall detection
-├── main.py                  # PyQt6-based GUI application
-├── stall_recovery_agent.zip # (Generated after training) Trained PPO agent
-├── README.md                # You're reading it!
-└── requirements.txt         # List of required packages
-🧪 How to Use
-▶️ Train the Agent
-Run the GUI:
-
+▶️ Usage
+1. Run the GUI
 bash
 Copy
 Edit
 python main.py
-Go to the Controls tab and click "Train Agent".
+2. Train the Agent
+Go to the Controls tab.
 
-🧪 Evaluate the Agent
-After training, click "Evaluate Agent".
+Click Train Agent to begin PPO training.
 
-The system will simulate flight scenarios and auto-adjust on stall detection.
+Model is saved as stall_recovery_agent.zip.
 
-📊 Analysis & Visualization
-Flight Data Tab: Plots of angle of attack vs. altitude with time.
+3. Evaluate the Agent
+Click Evaluate Agent to run a test simulation.
 
-Analysis Tab: Multiple subplots including throttle, speed, roll, stall margin, etc.
+Watch the Flight Data and Analysis tabs update in real time.
 
-Flight Table: Displays time-series flight stats including recovery status.
+📊 Visualizations
+Flight Data Tab: Displays a plot of Angle of Attack vs. Altitude over time.
 
-⚠️ Stall Warning System
-During simulation, if AoA exceeds the critical stall threshold (e.g., 15°), a red warning is shown in the GUI, and the agent attempts automatic recovery.
+Analysis Tab: Contains scatter, line, and bar plots for:
 
-📸 Screenshots
-(Add GUI screenshots here to enhance the readme)
+AoA
 
-📌 To-Do / Future Improvements
-Integration with real historical flight datasets.
+Altitude
 
-Extend support for other aircraft models.
+Speed
 
-Add more sophisticated failure conditions (engine loss, wind shear, etc.).
+Vertical speed
 
-Export flight logs to CSV/JSON.
+Throttle
+
+Roll
+
+Stall margin
+
+📂 File Structure
+python
+Copy
+Edit
+.
+├── AircraftSHAgent.py       # Gym environment + PPO training/evaluation
+├── main.py                  # PyQt6 GUI application
+├── README.md                # Project documentation
+├── requirements.txt         # Required dependencies
+└── stall_recovery_agent.zip # (generated) trained model file
+⚙️ How It Works
+The RL agent receives a 7-dimensional observation space (alpha, speed, pitch rate, etc.).
+
+It controls elevator and throttle to adjust flight state.
+
+Rewards are computed based on angle-of-attack and altitude preservation.
+
+Termination occurs on successful recovery or crash.
+
+The GUI tracks the state, logs metrics, and provides intuitive visual feedback.
+
+📌 Future Enhancements
+✅ Integrate real-world flight data logs.
+
+🔲 Add 3D visual model or simulation playback.
+
+🔲 Expand to more aircraft models.
+
+🔲 Incorporate adverse weather conditions and control surface failures.
